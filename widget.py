@@ -1,7 +1,7 @@
 """
-TokenKullanım - Masaüstü Yüzen Mini Widget (Universal AI Token HUD)
-ChatGPT, Claude, Gemini, Antigravity ve tüm masaüstü/tarayıcı araçlarında
-girilen promptları ve harcanan tokenları anında algılar, kalan kotanızı gösterir.
+TokenKullanım - Çoklu Model & Otomatik Algılayıcı Masaüstü Yüzen Widget
+IDE (Gemini 3.8 Flash), ChatGPT, Claude ve diğer AI araçlarındaki promptları
+tamamen otomatik olarak algılar ve ilgili modelin kotasını/harcamasını gösterir.
 """
 
 import os
@@ -14,18 +14,56 @@ import ctypes
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-# --- CONSTANTS & CONFIG ---
-CHECK_INTERVAL_MS = 600   # Check loop every 600ms
+CHECK_INTERVAL_MS = 500  # 500ms for instant responsiveness
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "widget_state.json")
 
-MODEL_PRICING = {
-    "GPT-4o (ChatGPT)": {"in": 2.50, "out": 10.00, "max_context": 128_000, "alias": "ChatGPT"},
-    "GPT-4o-mini": {"in": 0.15, "out": 0.60, "max_context": 128_000, "alias": "GPT-mini"},
-    "Claude 3.5 Sonnet": {"in": 3.00, "out": 15.00, "max_context": 200_000, "alias": "Claude"},
-    "Gemini 3.8 / 2.0 Flash": {"in": 0.10, "out": 0.40, "max_context": 1_000_000, "alias": "Gemini"},
-    "Gemini 1.5 Pro": {"in": 1.25, "out": 5.00, "max_context": 2_000_000, "alias": "Gemini-Pro"},
-    "DeepSeek-V3 / R1": {"in": 0.20, "out": 0.50, "max_context": 128_000, "alias": "DeepSeek"},
-    "Genel / Özel Model": {"in": 1.00, "out": 2.00, "max_context": 1_000_000, "alias": "AI Model"},
+# Default profiles for each environment
+DEFAULT_PROFILES = {
+    "gemini_ide": {
+        "id": "gemini_ide",
+        "name": "Gemini 3.8 Flash",
+        "env": "IDE (Antigravity)",
+        "tag": "IDE",
+        "max_quota": 1_000_000,
+        "spent_tokens": 0,
+        "last_in": 0,
+        "last_out": 0,
+        "last_summary": "Dinleniyor...",
+        "total_prompts": 0,
+        "price_in": 0.10,
+        "price_out": 0.40,
+        "color": "#10b981"  # Emerald
+    },
+    "chatgpt": {
+        "id": "chatgpt",
+        "name": "GPT-4o",
+        "env": "ChatGPT App / Web",
+        "tag": "ChatGPT",
+        "max_quota": 128_000,
+        "spent_tokens": 0,
+        "last_in": 0,
+        "last_out": 0,
+        "last_summary": "Dinleniyor...",
+        "total_prompts": 0,
+        "price_in": 2.50,
+        "price_out": 10.00,
+        "color": "#06b6d4"  # Cyan
+    },
+    "claude": {
+        "id": "claude",
+        "name": "Claude 3.5 Sonnet",
+        "env": "Claude App / Web",
+        "tag": "Claude",
+        "max_quota": 200_000,
+        "spent_tokens": 0,
+        "last_in": 0,
+        "last_out": 0,
+        "last_summary": "Dinleniyor...",
+        "total_prompts": 0,
+        "price_in": 3.00,
+        "price_out": 15.00,
+        "color": "#f59e0b"  # Amber
+    }
 }
 
 def get_active_window_title():
@@ -40,28 +78,22 @@ def get_active_window_title():
         pass
     return ""
 
-def detect_source_from_title(title):
+def detect_app_from_title(title):
     t_lower = (title or "").lower()
     if "chatgpt" in t_lower or "openai" in t_lower:
-        return "ChatGPT", "GPT-4o (ChatGPT)"
+        return "chatgpt", "ChatGPT"
     elif "claude" in t_lower or "anthropic" in t_lower:
-        return "Claude", "Claude 3.5 Sonnet"
+        return "claude", "Claude"
     elif "gemini" in t_lower or "aistudio" in t_lower:
-        return "Gemini", "Gemini 3.8 / 2.0 Flash"
-    elif "deepseek" in t_lower:
-        return "DeepSeek", "DeepSeek-V3 / R1"
-    elif "cursor" in t_lower:
-        return "Cursor AI", "Claude 3.5 Sonnet"
-    elif "perplexity" in t_lower:
-        return "Perplexity", "GPT-4o (ChatGPT)"
-    elif "antigravity" in t_lower:
-        return "Antigravity", "Gemini 3.8 / 2.0 Flash"
-    return "Masaüstü/Pano", None
+        return "gemini_ide", "Gemini Web"
+    elif "antigravity" in t_lower or "budget-control" in t_lower or "tokenkullanim" in t_lower:
+        return "gemini_ide", "IDE (Gemini)"
+    return None, None
 
 def estimate_tokens(text):
     if not text:
         return 0
-    words = text.match if hasattr(text, "match") else re.findall(r"\S+|\s+", text)
+    words = re.findall(r"\S+|\s+", text)
     token_count = 0
     for w in words:
         if re.match(r"^\s+$", w):
@@ -96,7 +128,6 @@ def parse_transcript(file_path):
         return None
 
     last_step = None
-    last_prompt = ""
     total_input = 0
     total_output = 0
     prompt_count = 0
@@ -114,7 +145,6 @@ def parse_transcript(file_path):
                     continue
 
                 if data.get("type") == "USER_INPUT":
-                    last_prompt = data.get("content", "")
                     prompt_count += 1
 
                 if "input_tokens" in data:
@@ -133,7 +163,6 @@ def parse_transcript(file_path):
 
         return {
             "last_step": last_step,
-            "last_prompt": last_prompt,
             "total_input": total_input,
             "total_output": total_output,
             "latest_context": latest_context,
@@ -143,86 +172,75 @@ def parse_transcript(file_path):
         return None
 
 
-class UniversalFloatingWidget:
+class AutoDetectHUDWidget:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("TokenKullanım Universal HUD")
+        self.root.title("TokenKullanım Auto HUD")
         self.root.overrideredirect(True)       # Frameless
         self.root.attributes("-topmost", True)  # Always on top
 
         # Colors
-        self.bg_color = "#0b0f19"         # Dark background
-        self.card_bg = "#151e32"          # Slate 800
-        self.card_border = "#263550"      # Slate 700
-        self.text_color = "#f8fafc"       # Text
-        self.muted_color = "#94a3b8"      # Muted text
+        self.bg_color = "#090d16"         # Darker Slate
+        self.card_bg = "#121a2c"          # Slate Container
+        self.card_border = "#22314e"      # Border
+        self.text_color = "#f8fafc"       # White
+        self.muted_color = "#94a3b8"      # Gray
         self.accent_color = "#818cf8"     # Indigo
-        self.cyan_color = "#22d3ee"       # Cyan
-        self.success_color = "#34d399"    # Emerald
-        self.warning_color = "#fbbf24"    # Amber
-        self.danger_color = "#f87171"     # Rose
+        self.success_color = "#10b981"    # Green
+        self.warning_color = "#f59e0b"    # Yellow
+        self.danger_color = "#ef4444"     # Red
 
         self.root.configure(bg=self.bg_color)
 
-        # State initialization
+        # Multi-Profile Storage
+        self.profiles = json.loads(json.dumps(DEFAULT_PROFILES))
+        self.active_profile_id = "gemini_ide"
         self.load_state()
 
-        # Runtime trackers
-        self.last_clipboard_text = ""
+        # Engine states
         self.last_transcript_mtime = 0
         self.active_transcript_path = None
-        self.is_compact = False
-        self.auto_clipboard_enabled = True
+        self.last_clipboard_text = ""
         self.estimated_output_tokens = 350
+        self.is_compact = False
 
-        # Drag coords
+        # Dragging
         self.drag_x = 0
         self.drag_y = 0
 
-        # Position top-right
+        # Position at top-right
         screen_w = self.root.winfo_screenwidth()
-        init_x = screen_w - 360
-        init_y = 50
-        self.root.geometry(f"340x280+{init_x}+{init_y}")
+        init_x = screen_w - 380
+        init_y = 45
+        self.root.geometry(f"360x300+{init_x}+{init_y}")
 
         self.setup_ui()
         self.bind_events()
 
-        # Start dual loop: Clipboard watcher + Transcript watcher
-        self.watch_loop()
+        # Initial IDE transcript sync
+        self.sync_ide_transcript(force=True)
+
+        # Launch auto-watcher loop
+        self.auto_watcher_loop()
 
     def load_state(self):
-        self.selected_model = "GPT-4o (ChatGPT)"
-        self.max_quota = 1_000_000
-        self.spent_tokens = 0
-        self.total_prompts = 0
-        self.last_source = "Başlatıldı"
-        self.last_prompt_summary = "İzleme aktif..."
-        self.last_in_tokens = 0
-        self.last_out_tokens = 0
-
         if os.path.exists(STATE_FILE):
             try:
                 with open(STATE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.selected_model = data.get("selected_model", self.selected_model)
-                    self.max_quota = data.get("max_quota", self.max_quota)
-                    self.spent_tokens = data.get("spent_tokens", 0)
-                    self.total_prompts = data.get("total_prompts", 0)
-                    self.last_source = data.get("last_source", self.last_source)
-                    self.last_prompt_summary = data.get("last_prompt_summary", self.last_prompt_summary)
+                    self.active_profile_id = data.get("active_profile_id", "gemini_ide")
+                    saved_profs = data.get("profiles", {})
+                    for pid, pdata in saved_profs.items():
+                        if pid in self.profiles:
+                            self.profiles[pid].update(pdata)
             except Exception:
                 pass
 
     def save_state(self):
         try:
             data = {
-                "selected_model": self.selected_model,
-                "max_quota": self.max_quota,
-                "spent_tokens": self.spent_tokens,
-                "total_prompts": self.total_prompts,
-                "last_source": self.last_source,
-                "last_prompt_summary": self.last_prompt_summary
+                "active_profile_id": self.active_profile_id,
+                "profiles": self.profiles
             }
             with open(STATE_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
@@ -238,7 +256,7 @@ class UniversalFloatingWidget:
 
         # --- HEADER ---
         self.header_frame = tk.Frame(self.main_container, bg=self.bg_color)
-        self.header_frame.pack(fill=tk.X, pady=(0, 10))
+        self.header_frame.pack(fill=tk.X, pady=(0, 8))
 
         self.title_group = tk.Frame(self.header_frame, bg=self.bg_color)
         self.title_group.pack(side=tk.LEFT)
@@ -246,14 +264,13 @@ class UniversalFloatingWidget:
         self.status_dot = tk.Label(self.title_group, text="●", fg=self.success_color, bg=self.bg_color, font=("Segoe UI", 11, "bold"))
         self.status_dot.pack(side=tk.LEFT, padx=(0, 5))
 
-        self.title_label = tk.Label(self.title_group, text="TokenKullanım", fg=self.text_color, bg=self.bg_color, font=("Segoe UI", 10, "bold"))
+        self.title_label = tk.Label(self.title_group, text="TokenKullanım Auto HUD", fg=self.text_color, bg=self.bg_color, font=("Segoe UI", 10, "bold"))
         self.title_label.pack(side=tk.LEFT)
 
         self.btn_group = tk.Frame(self.header_frame, bg=self.bg_color)
         self.btn_group.pack(side=tk.RIGHT)
 
-        # Quick capture button on header
-        self.btn_capture = tk.Label(self.btn_group, text="📋 Al", fg=self.cyan_color, bg=self.card_bg, font=("Segoe UI", 8, "bold"), padx=5, pady=2, cursor="hand2")
+        self.btn_capture = tk.Label(self.btn_group, text="📋 Al", fg="#38bdf8", bg=self.card_bg, font=("Segoe UI", 8, "bold"), padx=5, pady=2, cursor="hand2")
         self.btn_capture.pack(side=tk.LEFT, padx=3)
 
         self.btn_settings = tk.Label(self.btn_group, text="⚙", fg=self.muted_color, bg=self.bg_color, font=("Segoe UI", 10), cursor="hand2")
@@ -265,58 +282,80 @@ class UniversalFloatingWidget:
         self.btn_close = tk.Label(self.btn_group, text="✕", fg=self.muted_color, bg=self.bg_color, font=("Segoe UI", 10, "bold"), cursor="hand2")
         self.btn_close.pack(side=tk.LEFT, padx=3)
 
+        # --- MULTI-MODEL PROFILE SELECTOR TABS ---
+        self.tabs_frame = tk.Frame(self.main_container, bg=self.bg_color)
+        self.tabs_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.tab_buttons = {}
+        for pid in ["gemini_ide", "chatgpt", "claude"]:
+            p = self.profiles[pid]
+            lbl = tk.Label(
+                self.tabs_frame,
+                text=p["tag"],
+                fg=self.muted_color,
+                bg=self.card_bg,
+                font=("Segoe UI", 8, "bold"),
+                padx=8,
+                pady=3,
+                cursor="hand2"
+            )
+            lbl.pack(side=tk.LEFT, padx=(0, 5))
+            lbl.bind("<Button-1>", lambda e, p_id=pid: self.switch_profile(p_id))
+            self.tab_buttons[pid] = lbl
+
         # --- EXPANDED BODY ---
         self.body_frame = tk.Frame(self.main_container, bg=self.bg_color)
         self.body_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Card 1: App Source & Model Detection
+        # Card 1: Active Model & Last Action
         self.card1 = tk.Frame(self.body_frame, bg=self.card_bg, padx=10, pady=8)
         self.card1.pack(fill=tk.X, pady=(0, 8))
 
         self.card1_top = tk.Frame(self.card1, bg=self.card_bg)
         self.card1_top.pack(fill=tk.X)
 
-        self.source_badge = tk.Label(self.card1_top, text=f"Kaynak: {self.last_source}", fg=self.cyan_color, bg="#111d33", font=("Segoe UI", 8, "bold"), padx=6, pady=2)
-        self.source_badge.pack(side=tk.LEFT)
+        self.active_badge = tk.Label(self.card1_top, text="Aktif: IDE", fg=self.success_color, bg="#0d231b", font=("Segoe UI", 8, "bold"), padx=6, pady=2)
+        self.active_badge.pack(side=tk.LEFT)
 
-        self.model_badge = tk.Label(self.card1_top, text=self.selected_model.split("(")[0].strip(), fg=self.accent_color, bg=self.card_bg, font=("Segoe UI", 8, "bold"))
-        self.model_badge.pack(side=tk.RIGHT)
+        self.model_lbl = tk.Label(self.card1_top, text="Gemini 3.8 Flash", fg=self.text_color, bg=self.card_bg, font=("Segoe UI", 9, "bold"))
+        self.model_lbl.pack(side=tk.RIGHT)
 
-        self.last_prompt_lbl = tk.Label(self.card1, text=f"Son: {self.last_prompt_summary}", fg=self.text_color, bg=self.card_bg, font=("Segoe UI", 8, "bold"), anchor="w", justify="left")
-        self.last_prompt_lbl.pack(fill=tk.X, pady=(4, 0))
+        self.last_prompt_lbl = tk.Label(self.card1, text="Son: Dinleniyor...", fg=self.muted_color, bg=self.card_bg, font=("Segoe UI", 8, "bold"), anchor="w", justify="left")
+        self.last_prompt_lbl.pack(fill=tk.X, pady=(5, 0))
 
-        # Card 2: Progress & Quota Health
+        # Card 2: Quota & Context Health
         self.card2 = tk.Frame(self.body_frame, bg=self.card_bg, padx=10, pady=8)
         self.card2.pack(fill=tk.X, pady=(0, 8))
 
-        self.card2_header = tk.Frame(self.card2, bg=self.card_bg)
-        self.card2_header.pack(fill=tk.X)
+        self.card2_top = tk.Frame(self.card2, bg=self.card_bg)
+        self.card2_top.pack(fill=tk.X)
 
-        self.quota_title = tk.Label(self.card2_header, text="Kalan Kota / Kullanım:", fg=self.muted_color, bg=self.card_bg, font=("Segoe UI", 8))
-        self.quota_title.pack(side=tk.LEFT)
+        self.quota_label = tk.Label(self.card2_top, text="Kalan Kullanım Kotası:", fg=self.muted_color, bg=self.card_bg, font=("Segoe UI", 8))
+        self.quota_label.pack(side=tk.LEFT)
 
-        self.percent_lbl = tk.Label(self.card2_header, text="%100 Kalan", fg=self.success_color, bg=self.card_bg, font=("Segoe UI", 8, "bold"))
+        self.percent_lbl = tk.Label(self.card2_top, text="%100 Kalan", fg=self.success_color, bg=self.card_bg, font=("Segoe UI", 8, "bold"))
         self.percent_lbl.pack(side=tk.RIGHT)
 
-        self.progress_canvas = tk.Canvas(self.card2, height=8, bg="#0b0f19", highlightthickness=0)
+        # Progress bar
+        self.progress_canvas = tk.Canvas(self.card2, height=8, bg="#090d16", highlightthickness=0)
         self.progress_canvas.pack(fill=tk.X, pady=(6, 6))
 
-        self.quota_numbers_lbl = tk.Label(self.card2, text="0 / 1.000.000 token", fg=self.text_color, bg=self.card_bg, font=("JetBrains Mono", 8))
-        self.quota_numbers_lbl.pack(anchor="w")
+        self.numbers_lbl = tk.Label(self.card2, text="0 / 1.000.000 token", fg=self.text_color, bg=self.card_bg, font=("JetBrains Mono", 8))
+        self.numbers_lbl.pack(anchor="w")
 
-        # Bottom Row
+        # Bottom Row: Total Prompts & Cost
         self.bottom_row = tk.Frame(self.body_frame, bg=self.bg_color)
         self.bottom_row.pack(fill=tk.X)
 
-        self.total_lbl = tk.Label(self.bottom_row, text=f"Toplam: {self.total_prompts} prompt", fg=self.muted_color, bg=self.bg_color, font=("Segoe UI", 8))
-        self.total_lbl.pack(side=tk.LEFT)
+        self.totals_lbl = tk.Label(self.bottom_row, text="Toplam: 0 prompt", fg=self.muted_color, bg=self.bg_color, font=("Segoe UI", 8))
+        self.totals_lbl.pack(side=tk.LEFT)
 
-        self.cost_lbl = tk.Label(self.bottom_row, text="$0.0000", fg=self.cyan_color, bg=self.bg_color, font=("JetBrains Mono", 8, "bold"))
+        self.cost_lbl = tk.Label(self.bottom_row, text="$0.0000", fg="#38bdf8", bg=self.bg_color, font=("JetBrains Mono", 8, "bold"))
         self.cost_lbl.pack(side=tk.RIGHT)
 
-        # --- COMPACT VIEW ---
+        # --- COMPACT VIEW (Hidden by default) ---
         self.compact_frame = tk.Frame(self.main_container, bg=self.bg_color)
-        self.compact_lbl = tk.Label(self.compact_frame, text="🪙 %100 Kalan | 0 tok", fg=self.success_color, bg=self.bg_color, font=("Segoe UI", 9, "bold"))
+        self.compact_lbl = tk.Label(self.compact_frame, text="🪙 IDE: %100 Kalan", fg=self.success_color, bg=self.bg_color, font=("Segoe UI", 9, "bold"))
         self.compact_lbl.pack(side=tk.LEFT)
 
         self.update_display()
@@ -336,7 +375,7 @@ class UniversalFloatingWidget:
             btn.bind("<Leave>", lambda e, b=btn: b.configure(fg=self.muted_color))
 
         self.btn_capture.bind("<Enter>", lambda e: self.btn_capture.configure(bg="#1e293b", fg="#ffffff"))
-        self.btn_capture.bind("<Leave>", lambda e: self.btn_capture.configure(bg=self.card_bg, fg=self.cyan_color))
+        self.btn_capture.bind("<Leave>", lambda e: self.btn_capture.configure(bg=self.card_bg, fg="#38bdf8"))
 
     def on_drag_start(self, event):
         self.drag_x = event.x
@@ -351,203 +390,217 @@ class UniversalFloatingWidget:
         self.is_compact = not self.is_compact
         if self.is_compact:
             self.body_frame.pack_forget()
+            self.tabs_frame.pack_forget()
             self.compact_frame.pack(fill=tk.X, pady=(2, 0))
             self.btn_toggle.configure(text="□")
             x, y = self.root.winfo_x(), self.root.winfo_y()
-            self.root.geometry(f"270x60+{x}+{y}")
+            self.root.geometry(f"280x60+{x}+{y}")
         else:
             self.compact_frame.pack_forget()
+            self.tabs_frame.pack(fill=tk.X, pady=(0, 10))
             self.body_frame.pack(fill=tk.BOTH, expand=True)
             self.btn_toggle.configure(text="—")
             x, y = self.root.winfo_x(), self.root.winfo_y()
-            self.root.geometry(f"340x280+{x}+{y}")
+            self.root.geometry(f"360x300+{x}+{y}")
 
-    def draw_progress(self, ratio):
+    def switch_profile(self, profile_id, flash=False):
+        if profile_id not in self.profiles:
+            return
+        self.active_profile_id = profile_id
+
+        # Update tab visual highlights
+        for pid, btn in self.tab_buttons.items():
+            if pid == profile_id:
+                btn.configure(bg="#223555", fg=self.profiles[pid]["color"])
+            else:
+                btn.configure(bg=self.card_bg, fg=self.muted_color)
+
+        self.update_display()
+        if flash:
+            self.pulse_feedback()
+
+    def draw_progress(self, ratio, color):
         self.progress_canvas.delete("all")
         width = self.progress_canvas.winfo_width()
         if width <= 1:
-            width = 300
+            width = 320
         height = 8
 
-        self.progress_canvas.create_rectangle(0, 0, width, height, fill="#0b0f19", width=0)
+        self.progress_canvas.create_rectangle(0, 0, width, height, fill="#090d16", width=0)
 
         fill_width = int(width * ratio)
-        if ratio > 0.40:
-            fill_color = self.success_color
-        elif ratio > 0.15:
-            fill_color = self.warning_color
-        else:
-            fill_color = self.danger_color
-
         if fill_width > 0:
-            self.progress_canvas.create_rectangle(0, 0, fill_width, height, fill=fill_color, width=0)
+            self.progress_canvas.create_rectangle(0, 0, fill_width, height, fill=color, width=0)
 
     def update_display(self):
-        remaining = max(0, self.max_quota - self.spent_tokens)
-        ratio = (remaining / self.max_quota) if self.max_quota > 0 else 0
+        p = self.profiles[self.active_profile_id]
+
+        remaining = max(0, p["max_quota"] - p["spent_tokens"])
+        ratio = (remaining / p["max_quota"]) if p["max_quota"] > 0 else 0
         pct = ratio * 100
 
-        self.source_badge.configure(text=f"Kaynak: {self.last_source}")
-        self.model_badge.configure(text=self.selected_model.split("(")[0].strip())
-        self.last_prompt_lbl.configure(text=f"Son: {self.last_prompt_summary}")
+        self.active_badge.configure(text=f"Kaynak: {p['env']}", fg=p["color"])
+        self.model_lbl.configure(text=p["name"])
+        self.last_prompt_lbl.configure(text=f"Son: {p['last_summary']}")
 
-        color = self.success_color if pct > 30 else (self.warning_color if pct > 15 else self.danger_color)
-        self.percent_lbl.configure(text=f"%{pct:.1f} Kalan", fg=color)
-        self.quota_numbers_lbl.configure(text=f"{self.spent_tokens:,} / {self.max_quota:,} (Kalan: {remaining:,})")
+        health_color = self.success_color if pct > 30 else (self.warning_color if pct > 15 else self.danger_color)
+        self.percent_lbl.configure(text=f"%{pct:.1f} Kalan", fg=health_color)
+        self.numbers_lbl.configure(text=f"{p['spent_tokens']:,} / {p['max_quota']:,} (Kalan: {remaining:,})")
 
-        self.draw_progress(ratio)
+        self.draw_progress(ratio, health_color)
 
-        pricing = MODEL_PRICING.get(self.selected_model, MODEL_PRICING["GPT-4o (ChatGPT)"])
-        cost = (self.spent_tokens / 1_000_000) * ((pricing["in"] + pricing["out"]) / 2)
-        self.total_lbl.configure(text=f"Toplam: {self.total_prompts} prompt")
+        # Cost
+        cost = (p["spent_tokens"] / 1_000_000) * ((p["price_in"] + p["price_out"]) / 2)
+        self.totals_lbl.configure(text=f"Toplam: {p['total_prompts']} prompt")
         self.cost_lbl.configure(text=f"${cost:.4f}")
 
+        # Compact label
         self.compact_lbl.configure(
-            text=f"🪙 %{pct:.0f} Kalan | {self.spent_tokens/1000:.1f}k",
-            fg=color
+            text=f"🪙 {p['tag']}: %{pct:.0f} Kalan ({p['spent_tokens']/1000:.1f}k)",
+            fg=health_color
         )
 
     def pulse_feedback(self):
         self.status_dot.configure(fg="#38bdf8")
         self.root.after(300, lambda: self.status_dot.configure(fg=self.success_color))
 
-    def record_prompt_event(self, prompt_text, source_name, matched_model=None):
-        if not prompt_text or len(prompt_text.strip()) == 0:
-            return
-
-        in_tokens = estimate_tokens(prompt_text)
-        out_tokens = self.estimated_output_tokens
-
-        total_consumed = in_tokens + out_tokens
-        self.spent_tokens += total_consumed
-        self.total_prompts += 1
-        self.last_source = source_name
-        if matched_model:
-            self.selected_model = matched_model
-
-        snippet = prompt_text.replace("\n", " ").strip()
-        if len(snippet) > 36:
-            snippet = snippet[:36] + "..."
-        self.last_prompt_summary = f"+{total_consumed:,} tok ({snippet})"
-
-        self.save_state()
-        self.update_display()
-        self.pulse_feedback()
-
     def manual_capture_from_clipboard(self):
         try:
             txt = self.root.clipboard_get()
             if txt and txt.strip():
                 active_win = get_active_window_title()
-                app_name, matched_model = detect_source_from_title(active_win)
-                self.record_prompt_event(txt, app_name, matched_model)
+                app_id, app_name = detect_app_from_title(active_win)
+                target_id = app_id if app_id else self.active_profile_id
+                self.record_external_prompt(txt, target_id)
         except Exception:
             pass
 
-    def check_clipboard(self):
-        if not self.auto_clipboard_enabled:
+    def record_external_prompt(self, prompt_text, profile_id):
+        if not prompt_text or len(prompt_text.strip()) == 0:
             return
 
-        try:
-            txt = self.root.clipboard_get()
-            if txt and txt != self.last_clipboard_text:
-                self.last_clipboard_text = txt
-                clean = txt.strip()
-                if len(clean) >= 4:
-                    active_win = get_active_window_title()
-                    app_name, matched_model = detect_source_from_title(active_win)
-                    # If copied from an AI app or if explicitly flagged
-                    if app_name in ["ChatGPT", "Claude", "Gemini", "DeepSeek", "Perplexity", "Cursor AI"]:
-                        self.record_prompt_event(clean, app_name, matched_model)
-        except Exception:
-            pass
+        p = self.profiles[profile_id]
+        in_tokens = estimate_tokens(prompt_text)
+        out_tokens = self.estimated_output_tokens
+        total_consumed = in_tokens + out_tokens
 
-    def check_antigravity_transcript(self):
+        p["spent_tokens"] += total_consumed
+        p["total_prompts"] += 1
+        p["last_in"] = in_tokens
+        p["last_out"] = out_tokens
+
+        snippet = prompt_text.replace("\n", " ").strip()
+        if len(snippet) > 30:
+            snippet = snippet[:30] + "..."
+        p["last_summary"] = f"+{total_consumed:,} tok ({snippet})"
+
+        self.save_state()
+        self.switch_profile(profile_id, flash=True)
+
+    def sync_ide_transcript(self, force=False):
         latest_file = find_latest_transcript()
         if not latest_file:
             return
 
         try:
             mtime = os.path.getmtime(latest_file)
-            if mtime != self.last_transcript_mtime or latest_file != self.active_transcript_path:
+            if force or mtime != self.last_transcript_mtime or latest_file != self.active_transcript_path:
                 self.last_transcript_mtime = mtime
                 self.active_transcript_path = latest_file
+
                 data = parse_transcript(latest_file)
                 if data and data.get("last_step"):
                     last = data["last_step"]
                     in_t = last.get("input", 0)
                     out_t = last.get("output", 0)
                     tot = in_t + out_t
-                    self.last_source = "Antigravity"
-                    self.selected_model = "Gemini 3.8 / 2.0 Flash"
-                    self.spent_tokens = data.get("latest_context", self.spent_tokens)
-                    self.total_prompts = data.get("prompt_count", self.total_prompts)
-                    self.last_prompt_summary = f"+{in_t:,} in / +{out_t:,} out"
+
+                    p = self.profiles["gemini_ide"]
+                    p["spent_tokens"] = data.get("latest_context", p["spent_tokens"])
+                    p["total_prompts"] = data.get("prompt_count", p["total_prompts"])
+                    p["last_in"] = in_t
+                    p["last_out"] = out_t
+                    p["last_summary"] = f"+{in_t:,} in / +{out_t:,} out"
+
                     self.save_state()
-                    self.update_display()
-                    self.pulse_feedback()
+                    # Automatically flip active view to IDE if an IDE event occurred
+                    if not force:
+                        self.switch_profile("gemini_ide", flash=True)
+                    else:
+                        self.update_display()
         except Exception:
             pass
 
-    def watch_loop(self):
-        self.check_clipboard()
-        self.check_antigravity_transcript()
-        self.root.after(CHECK_INTERVAL_MS, self.watch_loop)
+    def check_active_window_and_clipboard(self):
+        # 1. Check window title
+        active_title = get_active_window_title()
+        app_id, app_name = detect_app_from_title(active_title)
+
+        # 2. Check clipboard
+        try:
+            txt = self.root.clipboard_get()
+            if txt and txt != self.last_clipboard_text:
+                self.last_clipboard_text = txt
+                clean = txt.strip()
+                if len(clean) >= 4:
+                    if app_id in ["chatgpt", "claude"]:
+                        self.record_external_prompt(clean, app_id)
+                    elif app_id == "gemini_ide":
+                        # Handled by transcript watcher
+                        pass
+        except Exception:
+            pass
+
+    def auto_watcher_loop(self):
+        # Run Engine A: IDE live transcript watcher
+        self.sync_ide_transcript()
+
+        # Run Engine B: Window and clipboard watcher
+        self.check_active_window_and_clipboard()
+
+        self.root.after(CHECK_INTERVAL_MS, self.auto_watcher_loop)
 
     def open_settings_dialog(self):
         dialog = tk.Toplevel(self.root)
-        dialog.title("Widget Ayarları")
+        dialog.title("Kota ve Model Ayarları")
         dialog.attributes("-topmost", True)
-        dialog.geometry("300x320")
+        dialog.geometry("320x330")
         dialog.configure(bg=self.bg_color)
         dialog.resizable(False, False)
 
-        tk.Label(dialog, text="Varsayılan Model:", fg=self.text_color, bg=self.bg_color, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=14, pady=(12, 2))
-        model_var = tk.StringVar(value=self.selected_model)
-        model_combo = ttk.Combobox(dialog, textvariable=model_var, values=list(MODEL_PRICING.keys()), state="readonly")
-        model_combo.pack(fill=tk.X, padx=14)
+        tk.Label(dialog, text="Profil Ayarları:", fg=self.text_color, bg=self.bg_color, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=14, pady=(12, 6))
 
-        tk.Label(dialog, text="Maksimum Context / Bütçe:", fg=self.text_color, bg=self.bg_color, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=14, pady=(10, 2))
-        quota_var = tk.StringVar(value=str(self.max_quota))
-        quota_entry = tk.Entry(dialog, textvariable=quota_var, bg=self.card_bg, fg=self.text_color, insertbackground=self.text_color)
-        quota_entry.pack(fill=tk.X, padx=14)
+        entries = {}
+        for pid, p in self.profiles.items():
+            row = tk.Frame(dialog, bg=self.bg_color)
+            row.pack(fill=tk.X, padx=14, pady=4)
 
-        tk.Label(dialog, text="Tahmini Yanıt Tokenı (Çıktı):", fg=self.text_color, bg=self.bg_color, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=14, pady=(10, 2))
-        out_var = tk.StringVar(value=str(self.estimated_output_tokens))
-        out_entry = tk.Entry(dialog, textvariable=out_var, bg=self.card_bg, fg=self.text_color, insertbackground=self.text_color)
-        out_entry.pack(fill=tk.X, padx=14)
+            tk.Label(row, text=f"{p['tag']} Kota:", fg=self.text_color, bg=self.bg_color, font=("Segoe UI", 8)).pack(side=tk.LEFT)
+            var = tk.StringVar(value=str(p["max_quota"]))
+            e = tk.Entry(row, textvariable=var, bg=self.card_bg, fg=self.text_color, width=14, insertbackground=self.text_color)
+            e.pack(side=tk.RIGHT)
+            entries[pid] = var
 
-        auto_cb_var = tk.BooleanVar(value=self.auto_clipboard_enabled)
-        cb = tk.Checkbutton(dialog, text="ChatGPT / AI Kopyalamalarını Otomatik Yakala", variable=auto_cb_var, bg=self.bg_color, fg=self.text_color, selectcolor=self.card_bg, activebackground=self.bg_color)
-        cb.pack(anchor="w", padx=14, pady=(10, 0))
-
-        def reset_spent():
-            self.spent_tokens = 0
-            self.total_prompts = 0
-            self.last_prompt_summary = "Sıfırlandı"
+        def reset_all_spent():
+            for pid in self.profiles:
+                self.profiles[pid]["spent_tokens"] = 0
+                self.profiles[pid]["total_prompts"] = 0
+                self.profiles[pid]["last_summary"] = "Sıfırlandı"
             self.save_state()
             self.update_display()
-            messagebox.showinfo("Bilgi", "Harcanan token sayacı sıfırlandı!", parent=dialog)
+            messagebox.showinfo("Bilgi", "Tüm profillerin token sayaçları sıfırlandı!", parent=dialog)
 
         btn_row = tk.Frame(dialog, bg=self.bg_color)
-        btn_row.pack(fill=tk.X, padx=14, pady=(16, 0))
+        btn_row.pack(fill=tk.X, padx=14, pady=(20, 0))
 
-        tk.Button(btn_row, text="Sayacı Sıfırla", command=reset_spent, bg="#dc2626", fg="#ffffff", font=("Segoe UI", 8, "bold"), relief="flat", padx=6, pady=4).pack(side=tk.LEFT)
+        tk.Button(btn_row, text="Tümünü Sıfırla", command=reset_all_spent, bg="#dc2626", fg="#ffffff", font=("Segoe UI", 8, "bold"), relief="flat", padx=6, pady=4).pack(side=tk.LEFT)
 
         def save_and_close():
-            chosen_model = model_var.get()
-            try:
-                self.max_quota = int(quota_var.get().replace(",", "").replace(".", ""))
-            except ValueError:
-                self.max_quota = 1_000_000
-
-            try:
-                self.estimated_output_tokens = int(out_var.get())
-            except ValueError:
-                self.estimated_output_tokens = 350
-
-            self.selected_model = chosen_model
-            self.auto_clipboard_enabled = auto_cb_var.get()
+            for pid, var in entries.items():
+                try:
+                    self.profiles[pid]["max_quota"] = int(var.get().replace(",", "").replace(".", ""))
+                except ValueError:
+                    pass
             self.save_state()
             self.update_display()
             dialog.destroy()
@@ -558,5 +611,5 @@ class UniversalFloatingWidget:
         self.root.mainloop()
 
 if __name__ == "__main__":
-    app = UniversalFloatingWidget()
+    app = AutoDetectHUDWidget()
     app.run()
