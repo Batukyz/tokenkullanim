@@ -1,0 +1,8 @@
+{
+  "selected_model": "Gemini 3.8 / 2.0 Flash",
+  "max_quota": 1000000,
+  "spent_tokens": 150859,
+  "total_prompts": 14,
+  "last_source": "Masaüstü/Pano",
+  "last_prompt_summary": "+395 tok (r (varsayılan: 350 token),   • Kotan...)"
+}
