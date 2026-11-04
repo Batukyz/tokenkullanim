@@ -1,64 +1,37 @@
-# 🪙 TokenKullanım (LLM Token & Budget Tracker)
+# 🪙 TokenKullanım (Desktop Floating HUD & Token Tracker)
 
 [🇹🇷 Türkçe](README.md) | [🇬🇧 English](README.en.md)
 
-Yapay zeka modellerine (OpenAI GPT-4o, Claude 3.5 Sonnet, Gemini 2.0 Flash, DeepSeek-V3 vb.) gönderilen her promptun ne kadar token tükettiğini, model yanıt maliyetini ve kalan bütçe / token kotanızı anlık olarak hesaplayan modern, hafif ve bağımsız bir takip uygulamasıdır.
+Yapay zeka asistanınızı (Antigravity, Gemini, OpenAI vb.) kullanırken **ekranınızın köşesinde daima en üstte duran küçük yüzen bir masaüstü widget'ıdır**. 
+Girdiğiniz her promptun ne kadar token harcadığını, modelin kalan kullanım kotasını ve toplam maliyetinizi gerçek zamanlı olarak izler.
 
 ---
 
-## 🌐 Canlı Kullanım (Kurulumsuz Tarayıcıda Aç)
+## 🖥️ Masaüstü Yüzen Mini Widget'ı Başlatma (En Çok Tercih Edilen)
 
-Herhangi bir dosya indirmeden veya kod çalıştırmadan doğrudan tarayıcınızda kullanmak için:
+Bilgisayarınızda doğrudan ekranın köşesine yerleşen mini widget'ı başlatmak için:
 
-👉 **[Canlı Uygulamayı Aç (GitHub Pages)](https://batukyz.github.io/tokenkullanim/)**
+1. Klasördeki **`start_widget.bat`** dosyasına **çift tıklayın**.
+2. Veya terminalde şu komutu çalıştırın:
+   ```bash
+   pythonw widget.py
+   ```
 
-*(Not: Henüz açılmıyorsa GitHub reponuzda **Settings &rarr; Pages &rarr; Build and deployment** altından Source'u **GitHub Actions** veya branch olarak **main** seçiniz).*
-
----
-
-## 💻 Bilgisayarınızda (Yerel Olarak) Nasıl Açılır?
-
-> [!IMPORTANT]
-> GitHub web sitesi üzerindeki `.html` veya `.bat` dosyalarına tıkladığınızda tarayıcı dosyayı çalıştırmaz, yalnızca kaynak kodunu gösterir. Uygulamayı bilgisayarınızda çalıştırmak için aşağıdaki adımları izleyin:
-
-### 1. Adım: Proje Klasörünü Açın
-Bilgisayarınızdaki dosya yöneticisinde (Windows Gezgini) şu klasöre gidin:
-```text
-C:\Users\furka\OneDrive\Documentos\GitHub\tokenkullanim
-```
-
-### 2. Adım: Başlatın
-- Klasör içerisindeki **`start.bat`** veya **`index.html`** dosyasına **çift tıklayın**.
-- Uygulama herhangi bir kuruluma veya sunucuya ihtiyaç duymadan varsayılan web tarayıcınızda (Chrome, Edge vb.) anında açılacaktır.
+### 🎛️ Mini Widget'ın Özellikleri:
+- **Daima En Üstte (Always on Top):** Kod yazarken veya sohbet ederken ekranınızın köşesinde görünür kalır.
+- **Sürüklenebilir:** Başlığından tutarak masaüstünüzde istediğiniz yere taşıyabilirsiniz.
+- **Canlı Senkronizasyon (Live Auto-Sync):** Antigravity / Gemini oturumunuzdaki canlı verileri anlık okur; prompt gönderdiğiniz anda sayaç otomatik güncellenir.
+- **Kompakt Mod:** `—` butonuna basarak sadece kalan yüzdeyi gösteren küçük bir hap görünümüne küçültebilirsiniz.
+- **Model ve Kota Ayarları:** `⚙` butonundan kotayı (1M, 2M, 128k vb.) ve modelinizi değiştirebilirsiniz.
 
 ---
 
-## 🌟 Öne Çıkan Özellikler
+## 🌐 Web Sürümü (Tarayıcı Paneli)
 
-1. **Canlı Prompt & Token Sayacı:**
-   - Promptunuzu yazarken gerçek zamanlı olarak **Karakter**, **Kelime** ve **Tahmini Token Sayısı** hesaplanır.
-   - Türkçe diline ve özel karakterlerine (`ç, ğ, ı, ö, ş, ü`) duyarlı alt-kelime (BPE) tahmin algoritması kullanır.
+Daha detaylı grafikler, geçmiş tablosu ve CSV çıktısı almak isterseniz web arayüzünü kullanabilirsiniz:
 
-2. **Görsel Tokenizer (Ayrıştırıcı Önizlemesi):**
-   - Yazdığınız metnin dil modeli tarafından kaç token parçasına bölündüğünü görsel çipler (`chips`) halinde inceler.
-
-3. **Kalan Token & Bütçe İlerleme Çubuğu:**
-   - Başlangıç kotası belirleyin (Örn: 100K, 500K, 1.000.000, 5M, 10M token veya özel miktar).
-   - Harcama yaptıkça dinamik renk değiştiren ilerleme çubuğu (Yeşil &rarr; Turuncu &rarr; Kırmızı) ile kalan yüzdenizi görün.
-
-4. **Model Fiyatlandırma & Maliyet Tahmini:**
-   - **OpenAI:** GPT-4o, GPT-4o-mini, o3-mini, GPT-4 Turbo
-   - **Anthropic:** Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
-   - **Google:** Gemini 2.0 Flash, Gemini 1.5 Flash, Gemini 1.5 Pro
-   - **DeepSeek & Açık Kaynak:** DeepSeek-V3, DeepSeek-R1, Llama 3.3 70B
-   - Her modelin 1M girdi/çıktı token fiyatına göre harcanan USD ($) tutarı tam hesaplanır.
-
-5. **Kullanım Geçmişi & CSV Dışa Aktarma:**
-   - Gönderilen her prompt; tarih, saat, seçilen model, girdi/çıktı tokenları, toplam harcama ve o andaki kalan bakiye ile yerel hafızaya (`localStorage`) kaydedilir.
-   - Tüm geçmişi CSV formatında tek tıkla Excel/Sheets için dışa aktarabilirsiniz.
-
-6. **Karanlık / Aydınlık Mod:**
-   - Göz yormayan modern cam efekti (glassmorphism) ve koyu/açık tema desteği.
+- **Canlı Web:** 👉 **[https://batukyz.github.io/tokenkullanim/](https://batukyz.github.io/tokenkullanim/)**
+- **Yerel Açılış:** Klasördeki `start.bat` veya `index.html` dosyasına çift tıklayın.
 
 ---
 
@@ -66,15 +39,15 @@ C:\Users\furka\OneDrive\Documentos\GitHub\tokenkullanim
 
 ```
 tokenkullanim/
-├── index.html        # Ana web uygulaması (HTML, Modern CSS & Vanilla JS)
-├── start.bat         # Windows için tek tıkla başlatıcı
-├── server.py         # İsteğe bağlı hafif Python sunucusu
-├── README.md         # Türkçe dokümantasyon
-├── README.en.md      # İngilizce dokümantasyon
-└── .gitignore        # Git görmezden gelme kuralları
+├── widget.py          # Masaüstü yüzen mini widget (Python Tkinter, 0 kurulum)
+├── start_widget.bat   # Mini widget'ı konsolsuz başlatan 1-tık çalıştırıcı
+├── index.html         # Web paneli ve görsel tokenizer
+├── start.bat          # Web panelini tarayıcıda açan başlatıcı
+├── README.md          # Türkçe dokümantasyon
+└── README.en.md       # İngilizce dokümantasyon
 ```
 
 ---
 
 ## 📜 Lisans
-MIT License. Dilediğiniz gibi geliştirebilir, projelerinizde kullanabilirsiniz.
+MIT License.

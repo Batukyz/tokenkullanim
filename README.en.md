@@ -1,65 +1,36 @@
-# 🪙 TokenKullanim (LLM Token & Budget Tracker)
+# 🪙 TokenKullanim (Desktop Floating HUD & Token Tracker)
 
 [🇹🇷 Türkçe](README.md) | [🇬🇧 English](README.en.md)
 
-A lightweight, standalone web application designed to track real-time token consumption for prompts sent to Large Language Models (OpenAI GPT-4o, Claude 3.5 Sonnet, Gemini 2.0 Flash, DeepSeek-V3, etc.), estimate response costs, and monitor remaining token quotas and budgets with an intuitive visual dashboard.
+A lightweight, **always-on-top desktop floating mini widget** designed to run alongside your AI workflows (Antigravity, Gemini, OpenAI, Claude, etc.). It monitors in real time how many tokens each of your prompts consumes, tracks your remaining model context/quota, and calculates estimated usage costs right on your screen.
 
 ---
 
-## 🌐 Live Web Demo (No Installation Required)
+## 🖥️ Launching the Desktop Floating Mini Widget
 
-Use the app directly in your web browser without downloading or configuring anything:
+To launch the floating HUD widget on your desktop:
 
-👉 **[Launch Live App (GitHub Pages)](https://batukyz.github.io/tokenkullanim/)**
+1. Double-click **`start_widget.bat`** in your project folder.
+2. Or run from the terminal:
+   ```bash
+   pythonw widget.py
+   ```
 
-*(Note: If not yet visible, go to your repository **Settings &rarr; Pages &rarr; Build and deployment** and select Source as **GitHub Actions** or branch **main**).*
-
----
-
-## 💻 Running Locally on Your Computer
-
-> [!IMPORTANT]
-> Clicking `.html` or `.bat` files directly on GitHub only previews their raw source code. To launch the interactive application on your computer:
-
-### Step 1: Open the Project Folder
-Open Windows File Explorer and navigate to your project directory:
-```text
-C:\Users\furka\OneDrive\Documentos\GitHub\tokenkullanim
-```
-
-### Step 2: Launch
-- Double-click **`start.bat`** or **`index.html`**.
-- The application will immediately open in your default browser (Chrome, Edge, Firefox, etc.) with full functionality and zero setup.
+### 🎛️ Mini Widget Features:
+- **Always on Top:** Stays pinned on your screen while you code or chat with your AI assistant.
+- **Draggable:** Click and drag from anywhere on the header to move it around your screen.
+- **Live Auto-Sync:** Automatically reads your active conversation transcript; pulses and updates the instant a prompt completes.
+- **Compact & Expanded Modes:** Click `—` to collapse into an ultra-compact mini pill.
+- **Configurable Models & Quotas:** Click `⚙` to adjust your model (Gemini, GPT-4o, Claude 3.5, DeepSeek) and token quota limits.
 
 ---
 
-## 🌟 Key Features
+## 🌐 Web Dashboard Version
 
-1. **Real-Time Prompt & Token Counter:**
-   - Automatically computes **Characters**, **Words**, and **Estimated Tokens** as you type your prompt.
-   - Utilizes a Byte-Pair Encoding (BPE) estimation algorithm optimized for multilingual texts, including special characters and suffixes.
+For in-depth analytics, visual tokenizer chips, and CSV exporting:
 
-2. **Interactive Visual Tokenizer:**
-   - Visualize how language models fragment your text into token chunks using color-coded visual chips.
-
-3. **Remaining Token Budget & Quota Bar:**
-   - Set custom token limits (e.g., 100K, 500K, 1 Million, 5M, 10M, or any custom value).
-   - Dynamic progress bar with adaptive health status colors (Green &rarr; Orange &rarr; Red) indicating remaining balance.
-
-4. **Multi-Model Support & Cost Estimation:**
-   - **OpenAI:** GPT-4o, GPT-4o-mini, o3-mini, GPT-4 Turbo
-   - **Anthropic:** Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
-   - **Google:** Gemini 2.0 Flash, Gemini 1.5 Flash, Gemini 1.5 Pro
-   - **DeepSeek & Open Source:** DeepSeek-V3, DeepSeek-R1, Llama 3.3 70B
-   - Automatic USD ($) cost calculation based on current per-1M input and output token pricing.
-
-5. **Prompt History & CSV Export:**
-   - Each prompt submission logs timestamps, chosen model, input/output tokens, total consumption, cost, and remaining quota.
-   - All data is securely persisted in browser `localStorage` (no backend database required).
-   - Export audit logs to CSV for analysis in Excel or Google Sheets.
-
-6. **Dark & Light Mode:**
-   - Modern glassmorphic user interface with instant theme switching.
+- **Live Web App:** 👉 **[https://batukyz.github.io/tokenkullanim/](https://batukyz.github.io/tokenkullanim/)**
+- **Local Browser:** Double-click `start.bat` or `index.html`.
 
 ---
 
@@ -67,15 +38,15 @@ C:\Users\furka\OneDrive\Documentos\GitHub\tokenkullanim
 
 ```
 tokenkullanim/
-├── index.html        # Main web application (HTML5, Modern CSS & Vanilla JS)
-├── start.bat         # 1-click Windows launcher
-├── server.py         # Optional lightweight Python HTTP server
-├── README.md         # Turkish documentation
-├── README.en.md      # English documentation
-└── .gitignore        # Git ignore rules
+├── widget.py          # Desktop floating mini widget (Native Tkinter, 0 dependencies)
+├── start_widget.bat   # 1-click launcher without command window
+├── index.html         # Web dashboard & tokenizer
+├── start.bat          # 1-click web launcher
+├── README.md          # Turkish documentation
+└── README.en.md       # English documentation
 ```
 
 ---
 
 ## 📜 License
-MIT License. Feel free to use, modify, and integrate into your workflows.
+MIT License.
