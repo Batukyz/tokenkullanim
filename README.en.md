@@ -6,6 +6,33 @@ A lightweight, standalone web application designed to track real-time token cons
 
 ---
 
+## 🌐 Live Web Demo (No Installation Required)
+
+Use the app directly in your web browser without downloading or configuring anything:
+
+👉 **[Launch Live App (GitHub Pages)](https://batukyz.github.io/tokenkullanim/)**
+
+*(Note: If not yet visible, go to your repository **Settings &rarr; Pages &rarr; Build and deployment** and select Source as **GitHub Actions** or branch **main**).*
+
+---
+
+## 💻 Running Locally on Your Computer
+
+> [!IMPORTANT]
+> Clicking `.html` or `.bat` files directly on GitHub only previews their raw source code. To launch the interactive application on your computer:
+
+### Step 1: Open the Project Folder
+Open Windows File Explorer and navigate to your project directory:
+```text
+C:\Users\furka\OneDrive\Documentos\GitHub\tokenkullanim
+```
+
+### Step 2: Launch
+- Double-click **`start.bat`** or **`index.html`**.
+- The application will immediately open in your default browser (Chrome, Edge, Firefox, etc.) with full functionality and zero setup.
+
+---
+
 ## 🌟 Key Features
 
 1. **Real-Time Prompt & Token Counter:**
@@ -36,27 +63,13 @@ A lightweight, standalone web application designed to track real-time token cons
 
 ---
 
-## 🚀 Getting Started
-
-### Method 1: Direct Double-Click (Zero Setup)
-Simply double-click [`index.html`](index.html) or [`start.bat`](start.bat) in your file explorer. It opens directly in any web browser without needing any installation or dependencies!
-
-### Method 2: Local Python Server
-Run the built-in lightweight Python server from your terminal:
-```bash
-python server.py
-```
-Your default browser will automatically open at `http://localhost:5000`.
-
----
-
 ## 📁 Repository Structure
 
 ```
 tokenkullanim/
 ├── index.html        # Main web application (HTML5, Modern CSS & Vanilla JS)
-├── server.py         # Optional lightweight Python HTTP server
 ├── start.bat         # 1-click Windows launcher
+├── server.py         # Optional lightweight Python HTTP server
 ├── README.md         # Turkish documentation
 ├── README.en.md      # English documentation
 └── .gitignore        # Git ignore rules

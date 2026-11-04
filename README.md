@@ -1,8 +1,35 @@
-# 🪙 TokenKullanım (Token Usage & Budget Tracker)
+# 🪙 TokenKullanım (LLM Token & Budget Tracker)
 
 [🇹🇷 Türkçe](README.md) | [🇬🇧 English](README.en.md)
 
 Yapay zeka modellerine (OpenAI GPT-4o, Claude 3.5 Sonnet, Gemini 2.0 Flash, DeepSeek-V3 vb.) gönderilen her promptun ne kadar token tükettiğini, model yanıt maliyetini ve kalan bütçe / token kotanızı anlık olarak hesaplayan modern, hafif ve bağımsız bir takip uygulamasıdır.
+
+---
+
+## 🌐 Canlı Kullanım (Kurulumsuz Tarayıcıda Aç)
+
+Herhangi bir dosya indirmeden veya kod çalıştırmadan doğrudan tarayıcınızda kullanmak için:
+
+👉 **[Canlı Uygulamayı Aç (GitHub Pages)](https://batukyz.github.io/tokenkullanim/)**
+
+*(Not: Henüz açılmıyorsa GitHub reponuzda **Settings &rarr; Pages &rarr; Build and deployment** altından Source'u **GitHub Actions** veya branch olarak **main** seçiniz).*
+
+---
+
+## 💻 Bilgisayarınızda (Yerel Olarak) Nasıl Açılır?
+
+> [!IMPORTANT]
+> GitHub web sitesi üzerindeki `.html` veya `.bat` dosyalarına tıkladığınızda tarayıcı dosyayı çalıştırmaz, yalnızca kaynak kodunu gösterir. Uygulamayı bilgisayarınızda çalıştırmak için aşağıdaki adımları izleyin:
+
+### 1. Adım: Proje Klasörünü Açın
+Bilgisayarınızdaki dosya yöneticisinde (Windows Gezgini) şu klasöre gidin:
+```text
+C:\Users\furka\OneDrive\Documentos\GitHub\tokenkullanim
+```
+
+### 2. Adım: Başlatın
+- Klasör içerisindeki **`start.bat`** veya **`index.html`** dosyasına **çift tıklayın**.
+- Uygulama herhangi bir kuruluma veya sunucuya ihtiyaç duymadan varsayılan web tarayıcınızda (Chrome, Edge vb.) anında açılacaktır.
 
 ---
 
@@ -17,7 +44,7 @@ Yapay zeka modellerine (OpenAI GPT-4o, Claude 3.5 Sonnet, Gemini 2.0 Flash, Deep
 
 3. **Kalan Token & Bütçe İlerleme Çubuğu:**
    - Başlangıç kotası belirleyin (Örn: 100K, 500K, 1.000.000, 5M, 10M token veya özel miktar).
-   - Harcama yaptıkça dinamik renk değiştiren ilerleme çubuğu (Yeşil → Turuncu → Kırmızı) ile kalan yüzdenizi görün.
+   - Harcama yaptıkça dinamik renk değiştiren ilerleme çubuğu (Yeşil &rarr; Turuncu &rarr; Kırmızı) ile kalan yüzdenizi görün.
 
 4. **Model Fiyatlandırma & Maliyet Tahmini:**
    - **OpenAI:** GPT-4o, GPT-4o-mini, o3-mini, GPT-4 Turbo
@@ -35,28 +62,15 @@ Yapay zeka modellerine (OpenAI GPT-4o, Claude 3.5 Sonnet, Gemini 2.0 Flash, Deep
 
 ---
 
-## 🚀 Çalıştırma Yöntemleri
-
-### Yöntem 1: Çift Tıklayarak (En Basit)
-Klasördeki [`index.html`](index.html) veya [`start.bat`](start.bat) dosyasına çift tıklayarak tarayıcınızda doğrudan açıp kullanabilirsiniz. Kurulum veya bağımlılık gerektirmez!
-
-### Yöntem 2: Python Yerel Sunucusu ile
-Terminalde klasör içine girip şu komutu çalıştırın:
-```bash
-python server.py
-```
-Otomatik olarak varsayılan tarayıcınızda `http://localhost:5000` adresi açılacaktır.
-
----
-
 ## 📁 Proje Dosya Yapısı
 
 ```
 tokenkullanim/
 ├── index.html        # Ana web uygulaması (HTML, Modern CSS & Vanilla JS)
-├── server.py         # Hafif yerel Python sunucusu (İsteğe bağlı)
 ├── start.bat         # Windows için tek tıkla başlatıcı
-├── README.md         # Proje belgelendirmesi
+├── server.py         # İsteğe bağlı hafif Python sunucusu
+├── README.md         # Türkçe dokümantasyon
+├── README.en.md      # İngilizce dokümantasyon
 └── .gitignore        # Git görmezden gelme kuralları
 ```
 
