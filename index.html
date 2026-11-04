@@ -1,0 +1,1631 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TokenKullanım · LLM Token ve Kalan Bakiye Takipçisi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='url(%23g)'/%3E%3Cpath d='M20 32h24M32 20v24' stroke='%23fff' stroke-width='5.5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='32' r='20' stroke='%23fff' stroke-width='3.5' fill='none' opacity='0.75'/%3E%3C/svg%3E">
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("tokenkullanim_theme");
+      if (savedTheme === "dark" || (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
+  <style>
+    :root {
+      --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      --bg: #f8fafc;
+      --bg-mesh: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 48%),
+                 radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.12) 0px, transparent 48%),
+                 radial-gradient(at 50% 100%, rgba(244, 63, 94, 0.06) 0px, transparent 50%);
+      --card: rgba(255, 255, 255, 0.94);
+      --card-solid: #ffffff;
+      --card-header: #f1f5f9;
+      --border: #e2e8f0;
+      --border-hover: #cbd5e1;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-light: rgba(99, 102, 241, 0.10);
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --cyan: #0891b2;
+      --cyan-light: rgba(8, 145, 178, 0.12);
+      --success: #10b981;
+      --success-light: rgba(16, 185, 129, 0.12);
+      --warning: #f59e0b;
+      --warning-light: rgba(245, 158, 11, 0.12);
+      --danger: #ef4444;
+      --danger-light: rgba(239, 68, 68, 0.12);
+      --input-bg: #f1f5f9;
+      --chip-bg: #e2e8f0;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-xl: 24px;
+      --radius-pill: 9999px;
+
+      --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 10px 30px -5px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.03);
+      --shadow-lg: 0 20px 40px -10px rgba(15, 23, 42, 0.12);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b0f19;
+      --bg-mesh: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.16) 0px, transparent 50%),
+                 radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.14) 0px, transparent 50%),
+                 radial-gradient(at 50% 100%, rgba(244, 63, 94, 0.08) 0px, transparent 50%);
+      --card: rgba(17, 24, 39, 0.90);
+      --card-solid: #111827;
+      --card-header: #151e32;
+      --border: #26334d;
+      --border-hover: #3b4d71;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #818cf8;
+      --accent-hover: #6366f1;
+      --accent-light: rgba(129, 140, 248, 0.16);
+      --accent-glow: rgba(129, 140, 248, 0.35);
+      --cyan: #22d3ee;
+      --cyan-light: rgba(34, 211, 238, 0.15);
+      --success: #34d399;
+      --success-light: rgba(52, 211, 153, 0.15);
+      --warning: #fbbf24;
+      --warning-light: rgba(251, 191, 36, 0.15);
+      --danger: #f87171;
+      --danger-light: rgba(248, 113, 113, 0.15);
+      --input-bg: #1a2438;
+      --chip-bg: #223049;
+      --shadow-md: 0 10px 30px -5px rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      background-image: var(--bg-mesh);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 70px;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    /* Top Bar */
+    header.top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1 0%, #0891b2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 6px 18px var(--accent-glow);
+    }
+
+    .brand-title-wrap h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+    }
+
+    .brand-title-wrap span {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: var(--radius-md);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      font-family: inherit;
+    }
+
+    .btn-secondary {
+      background: var(--card-solid);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background: var(--input-bg);
+      border-color: var(--border-hover);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .btn-danger-outline {
+      background: transparent;
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .btn-danger-outline:hover {
+      background: var(--danger-light);
+    }
+
+    .btn-icon-only {
+      padding: 9px;
+      width: 40px;
+      height: 40px;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1240px;
+      margin: 28px auto 0;
+      padding: 0 24px;
+    }
+
+    /* Quota Card */
+    .quota-card {
+      background: var(--card);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 24px 28px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 24px;
+    }
+
+    .quota-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .quota-title-wrap h2 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .quota-title-wrap p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .progress-bar-container {
+      height: 16px;
+      background: var(--input-bg);
+      border-radius: var(--radius-pill);
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: var(--radius-pill);
+      transition: width 0.4s ease, background 0.3s ease;
+      background: linear-gradient(90deg, #10b981 0%, #6366f1 100%);
+    }
+
+    .quota-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .metric-card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .metric-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+    }
+
+    .metric-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .metric-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    .metric-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-mono);
+    }
+
+    .metric-value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .metric-value {
+      font-size: 2.1rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .metric-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    /* Main App Layout */
+    .app-layout {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 980px) {
+      .app-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card Panels */
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 26px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-size: 1.18rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-title-badge {
+      font-size: 0.75rem;
+      background: var(--accent-light);
+      color: var(--accent);
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 7px;
+      color: var(--text);
+    }
+
+    .form-group label .hint {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .form-control, select.form-control, textarea.form-control {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 11px 14px;
+      font-family: inherit;
+      font-size: 0.92rem;
+      color: var(--text);
+      transition: all 0.2s ease;
+    }
+
+    textarea.form-control {
+      font-family: var(--font-sans);
+      resize: vertical;
+      min-height: 140px;
+      line-height: 1.55;
+    }
+
+    .form-control:focus, textarea.form-control:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--card-solid);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .template-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .chip-btn {
+      background: var(--chip-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 5px 11px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .chip-btn:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Live Counter Bar */
+    .live-counter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 18px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .live-stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .live-stat-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .live-stat-num {
+      font-size: 1.15rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+
+    .live-stat-num.highlight {
+      color: var(--accent);
+    }
+
+    /* Token Visualizer */
+    .token-viz-container {
+      margin-top: 14px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      background: rgba(0,0,0,0.02);
+      max-height: 160px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    [data-theme="dark"] .token-viz-container {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .token-viz-container.active {
+      display: block;
+    }
+
+    .token-chip {
+      display: inline-block;
+      padding: 2px 6px;
+      margin: 2px;
+      font-size: 0.76rem;
+      font-family: var(--font-mono);
+      border-radius: 4px;
+      background: var(--accent-light);
+      border: 1px solid var(--accent);
+      color: var(--text);
+    }
+
+    /* Table */
+    .table-responsive {
+      overflow-x: auto;
+      margin-top: 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    table.data-table th {
+      background: var(--card-header);
+      padding: 12px 14px;
+      font-weight: 700;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    table.data-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    table.data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.data-table tbody tr:hover {
+      background: rgba(99, 102, 241, 0.04);
+    }
+
+    .prompt-cell {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .prompt-cell:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    .token-pill {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--card-solid);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      max-width: 540px;
+      width: 100%;
+      padding: 26px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 1.35rem;
+      line-height: 1;
+    }
+
+    .close-btn:hover {
+      color: var(--text);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--card-solid);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      z-index: 200;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="top-nav">
+    <div class="brand-group">
+      <div class="brand-icon-box">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 6v12M6 12h12"/>
+        </svg>
+      </div>
+      <div class="brand-title-wrap">
+        <h1>TokenKullanım</h1>
+        <span>LLM Prompt Token Tüketim & Kalan Bakiye Takipçisi</span>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <button id="themeToggleBtn" class="btn btn-secondary btn-icon-only" title="Tema Değiştir">
+        <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- Quota & Progress Overview -->
+    <div class="quota-card">
+      <div class="quota-header">
+        <div class="quota-title-wrap">
+          <h2>Kalan Token Bütçesi & Kullanım Oranı</h2>
+          <p id="quotaSummaryText">Her promptta kaç token harcandığını ve kalan kotanızın ne kadar gittiğini anlık takip edin.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="openConfigModalBtn" class="btn btn-secondary" style="font-size: 0.82rem; padding: 7px 14px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+            <span>Kotayı / Bütçeyi Düzenle</span>
+          </button>
+          <button id="resetQuotaBtn" class="btn btn-secondary" style="font-size: 0.82rem; padding: 7px 14px; color: var(--warning);" title="Harcanan sayacını sıfırla ve kotayı yenile">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/>
+              <path d="M21 3v5h-5"/>
+              <path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/>
+              <path d="M3 21v-5h5"/>
+            </svg>
+            <span>Kotayı Sıfırla</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="progress-bar-container">
+        <div id="quotaProgressBar" class="progress-bar-fill" style="width: 100%;"></div>
+      </div>
+
+      <div class="quota-labels">
+        <span id="spentLabel">Harcanan: 0</span>
+        <span id="percentRemainingLabel">%100 Kalan</span>
+        <span id="totalQuotaLabel">Toplam: 1,000,000</span>
+      </div>
+    </div>
+
+    <!-- Quick Stats Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <span class="metric-title">Kalan Token Bakiyesi</span>
+          <span id="remainingBadge" class="metric-badge" style="background: var(--success-light); color: var(--success);">KULLANIMA HAZIR</span>
+        </div>
+        <div class="metric-value-row">
+          <span id="metricRemaining" class="metric-value" style="color: var(--success);">1,000,000</span>
+          <span class="metric-sub">token</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <span class="metric-title">Toplam Tüketilen Token</span>
+          <span class="metric-badge" style="background: var(--accent-light); color: var(--accent);">TÜKETİM</span>
+        </div>
+        <div class="metric-value-row">
+          <span id="metricSpent" class="metric-value" style="color: var(--accent);">0</span>
+          <span class="metric-sub">token</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <span class="metric-title">Tahmini Harcama ($)</span>
+          <span class="metric-badge" style="background: var(--cyan-light); color: var(--cyan);">USD MALİYET</span>
+        </div>
+        <div class="metric-value-row">
+          <span id="metricCost" class="metric-value" style="color: var(--cyan);">$0.0000</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <span class="metric-title">Toplam Gönderilen Prompt</span>
+          <span class="metric-badge" style="background: var(--input-bg); color: var(--text);">İŞLEM</span>
+        </div>
+        <div class="metric-value-row">
+          <span id="metricPromptCount" class="metric-value">0</span>
+          <span class="metric-sub">adet</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main App Layout -->
+    <div class="app-layout">
+
+      <!-- LEFT: Prompt Input and Live Estimator -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Prompt Girişi & Canlı Token Ölçümü</span>
+          </div>
+          <span class="panel-title-badge" id="currentModelBadge">GPT-4o</span>
+        </div>
+
+        <!-- Model Selection -->
+        <div class="form-group">
+          <label for="modelSelect">
+            <span>Yapay Zeka Modeli</span>
+            <span class="hint" id="modelPriceHint">$2.50 / $10.00 (1M token)</span>
+          </label>
+          <select id="modelSelect" class="form-control">
+            <optgroup label="OpenAI">
+              <option value="gpt-4o" data-in="2.50" data-out="10.00" selected>GPT-4o (Standart Amiral)</option>
+              <option value="gpt-4o-mini" data-in="0.15" data-out="0.60">GPT-4o-mini (Ekonomik & Hızlı)</option>
+              <option value="o3-mini" data-in="1.10" data-out="4.40">o3-mini (Akıl Yürütme)</option>
+              <option value="gpt-4-turbo" data-in="10.00" data-out="30.00">GPT-4 Turbo</option>
+            </optgroup>
+            <optgroup label="Anthropic">
+              <option value="claude-3-5-sonnet" data-in="3.00" data-out="15.00">Claude 3.5 Sonnet</option>
+              <option value="claude-3-5-haiku" data-in="0.80" data-out="4.00">Claude 3.5 Haiku</option>
+              <option value="claude-3-opus" data-in="15.00" data-out="75.00">Claude 3 Opus</option>
+            </optgroup>
+            <optgroup label="Google">
+              <option value="gemini-2-0-flash" data-in="0.10" data-out="0.40">Gemini 2.0 Flash</option>
+              <option value="gemini-1-5-flash" data-in="0.075" data-out="0.30">Gemini 1.5 Flash</option>
+              <option value="gemini-1-5-pro" data-in="1.25" data-out="5.00">Gemini 1.5 Pro</option>
+            </optgroup>
+            <optgroup label="DeepSeek & Açık Kaynak">
+              <option value="deepseek-v3" data-in="0.14" data-out="0.28">DeepSeek-V3</option>
+              <option value="deepseek-r1" data-in="0.55" data-out="2.19">DeepSeek-R1 (Reasoning)</option>
+              <option value="llama-3-3" data-in="0.40" data-out="0.40">Llama 3.3 70B</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- Optional System Prompt -->
+        <div class="form-group" style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label for="systemPrompt" style="margin: 0; cursor: pointer;">
+              <span>Sistem Mesajı (System Prompt)</span>
+            </label>
+            <button id="toggleSystemPromptBtn" class="chip-btn" style="padding: 2px 8px; font-size: 0.72rem;">+ Göster / Gizle</button>
+          </div>
+          <div id="systemPromptContainer" style="display: none; margin-top: 6px;">
+            <textarea id="systemPrompt" class="form-control" style="min-height: 70px; font-size: 0.85rem;" placeholder="Örn: Sen yardımsever ve uzman bir yapay zeka asistanısın..."></textarea>
+          </div>
+        </div>
+
+        <!-- User Prompt -->
+        <div class="form-group">
+          <label for="promptInput">
+            <span>Kullanıcı Promptu (User Prompt)</span>
+            <span class="hint">Yazdıkça anlık token hesaplanır</span>
+          </label>
+          <textarea id="promptInput" class="form-control" placeholder="Test etmek veya tüketimini görmek istediğiniz promptu buraya yazın veya yapıştırın..."></textarea>
+          
+          <!-- Hızlı Şablonlar -->
+          <div class="template-chips">
+            <span style="font-size: 0.75rem; color: var(--muted); align-self: center;">Örnek Şablonlar:</span>
+            <button class="chip-btn" data-template="Bana Python FastAPI kullanarak JWT authentication ve SQLite veritabanı ile çalışan basit bir bütçe takip API'si yaz. Kodları açıklamalarıyla beraber detaylı ver.">🐍 Python API Kodu</button>
+            <button class="chip-btn" data-template="Aşağıdaki finansal raporu özetle ve 3 maddede tasarruf önerisi çıkar: Şirket bu ay sunucu giderlerinde %40 artış yaşadı, pazarlama harcamaları sabit kaldı.">📊 Rapor Özeti</button>
+            <button class="chip-btn" data-template="Dünya ekonomisinde yapay zeka ajanlarının oluşturduğu yeni ekonomik paradigma ve şirketlerin maliyet yapılarına etkileri hakkında 500 kelimelik analiz makalesi yaz.">📝 Analiz Makalesi</button>
+            <button class="chip-btn" data-template="Merhaba, bana bugün için sağlıklı bir öğle yemeği önerir misin?">💬 Kısa Soru</button>
+          </div>
+        </div>
+
+        <!-- Live Statistics Bar for Prompt -->
+        <div class="live-counter-bar">
+          <div class="live-stat-item">
+            <span class="live-stat-label">Prompt Token</span>
+            <span id="livePromptTokens" class="live-stat-num highlight">0</span>
+          </div>
+          <div class="live-stat-item">
+            <span class="live-stat-label">Karakter</span>
+            <span id="liveChars" class="live-stat-num">0</span>
+          </div>
+          <div class="live-stat-item">
+            <span class="live-stat-label">Kelime</span>
+            <span id="liveWords" class="live-stat-num">0</span>
+          </div>
+          <div class="live-stat-item">
+            <span class="live-stat-label">Tahmini Girdi Tutarı</span>
+            <span id="liveInputCost" class="live-stat-num" style="color: var(--cyan); font-size: 0.95rem;">$0.0000</span>
+          </div>
+        </div>
+
+        <!-- Response Simulation -->
+        <div class="form-group" style="margin-top: 18px;">
+          <label>
+            <span>Model Yanıtı (Çıktı / Output Token Simülasyonu)</span>
+            <span class="hint">Modelin beklenen yanıt uzunluğu</span>
+          </label>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px;">
+            <button type="button" class="btn btn-secondary output-preset-btn active" data-tokens="150" style="padding: 6px 8px; font-size: 0.78rem;">Kısa (~150)</button>
+            <button type="button" class="btn btn-secondary output-preset-btn" data-tokens="450" style="padding: 6px 8px; font-size: 0.78rem;">Orta (~450)</button>
+            <button type="button" class="btn btn-secondary output-preset-btn" data-tokens="1200" style="padding: 6px 8px; font-size: 0.78rem;">Uzun (~1.2K)</button>
+            <button type="button" class="btn btn-secondary output-preset-btn" data-tokens="custom" style="padding: 6px 8px; font-size: 0.78rem;">Özel / Yanıt</button>
+          </div>
+          <div id="customResponseArea" style="display: none; margin-top: 8px;">
+            <textarea id="responseInput" class="form-control" style="min-height: 80px;" placeholder="Modelden dönen gerçek yanıtı buraya yapıştırabilirsiniz (token tam hesaplanır)..."></textarea>
+          </div>
+        </div>
+
+        <!-- Visualizer Toggle & Clear -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+          <button id="toggleVizBtn" class="btn btn-secondary" style="font-size: 0.78rem; padding: 6px 12px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+            <span>Token Ayrıştırma Önizlemesi (Tokenizer)</span>
+          </button>
+          <button id="clearPromptBtn" class="btn btn-secondary" style="font-size: 0.78rem; padding: 6px 12px; color: var(--muted);">Temizle</button>
+        </div>
+
+        <div id="tokenVizBox" class="token-viz-container">
+          <div style="font-size: 0.72rem; color: var(--muted); margin-bottom: 6px;">Tahmini token parçaları:</div>
+          <div id="tokenChipsContainer"></div>
+        </div>
+
+        <!-- Action Button -->
+        <div style="margin-top: 24px;">
+          <button id="executePromptBtn" class="btn btn-primary" style="width: 100%; padding: 14px 20px; font-size: 1.05rem; border-radius: var(--radius-md);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span id="executeBtnText">Promptu Gönder & Token Harca</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Log & History -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="12 8 12 12 14 14"/>
+              <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/>
+            </svg>
+            <span>Prompt ve Tüketim Geçmişi</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="exportCsvBtn" class="btn btn-secondary" style="font-size: 0.75rem; padding: 5px 12px;" title="CSV İndir">CSV İndir</button>
+            <button id="clearHistoryBtn" class="btn btn-danger-outline" style="font-size: 0.75rem; padding: 5px 12px;" title="Geçmişi Temizle">Temizle</button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <input type="text" id="searchHistoryInput" class="form-control" style="font-size: 0.82rem; padding: 7px 12px; width: 62%;" placeholder="Geçmişte ara (model, prompt)...">
+          <span id="historyCountBadge" style="font-size: 0.8rem; color: var(--muted); font-weight: 700;">0 Kayıt</span>
+        </div>
+
+        <div class="table-responsive" style="max-height: 480px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Zaman</th>
+                <th>Model</th>
+                <th>Prompt</th>
+                <th>Girdi / Çıktı</th>
+                <th>Toplam</th>
+                <th>Kalan</th>
+                <th>Maliyet</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--muted); padding: 36px 16px;">
+                  Henüz prompt gönderilmedi.<br>Sol taraftan bir prompt yazıp <b>"Promptu Gönder & Token Harca"</b> butonuna basarak tüketimi başlatabilirsiniz.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- CONFIG MODAL -->
+  <div id="configModal" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Token Kotası ve Ayarları Düzenle</h3>
+        <button id="closeConfigModalBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="form-group">
+        <label for="configQuotaInput">
+          <span>Toplam Token Kotası</span>
+          <span class="hint">Örn: 1,000,000</span>
+        </label>
+        <input type="number" id="configQuotaInput" class="form-control" min="1000" step="10000" value="1000000">
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+        <button type="button" class="chip-btn quick-quota-btn" data-val="100000">100K</button>
+        <button type="button" class="chip-btn quick-quota-btn" data-val="500000">500K</button>
+        <button type="button" class="chip-btn quick-quota-btn" data-val="1000000">1 Milyon</button>
+        <button type="button" class="chip-btn quick-quota-btn" data-val="5000000">5 Milyon</button>
+        <button type="button" class="chip-btn quick-quota-btn" data-val="10000000">10 Milyon</button>
+      </div>
+      <div class="form-group">
+        <label for="configCurrentSpentInput">
+          <span>Şu Ana Kadar Harcanan Token (İsteğe bağlı)</span>
+        </label>
+        <input type="number" id="configCurrentSpentInput" class="form-control" min="0" value="0">
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button id="cancelConfigBtn" class="btn btn-secondary">İptal</button>
+        <button id="saveConfigBtn" class="btn btn-primary">Kaydet & Güncelle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROMPT DETAIL MODAL -->
+  <div id="detailModal" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 id="detailModalTitle">Prompt Detayları</h3>
+        <button id="closeDetailModalBtn" class="close-btn">&times;</button>
+      </div>
+      <div style="margin-bottom: 14px;">
+        <div style="font-size: 0.78rem; font-weight: 700; color: var(--muted); margin-bottom: 4px;">MODEL & TARİH</div>
+        <div id="detailModelDate" style="font-size: 0.92rem; font-weight: 600;"></div>
+      </div>
+      <div style="margin-bottom: 14px;">
+        <div style="font-size: 0.78rem; font-weight: 700; color: var(--muted); margin-bottom: 4px;">GÖNDERİLEN PROMPT METNİ</div>
+        <div id="detailPromptText" style="background: var(--input-bg); padding: 14px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.85rem; max-height: 220px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;"></div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px;">
+        <div style="background: var(--input-bg); padding: 12px; border-radius: var(--radius-sm); text-align: center;">
+          <div style="font-size: 0.72rem; color: var(--muted); font-weight: 600;">GİRDİ TOKEN</div>
+          <div id="detailInputTokens" style="font-weight: 800; font-family: var(--font-mono); font-size: 1.1rem;">0</div>
+        </div>
+        <div style="background: var(--input-bg); padding: 12px; border-radius: var(--radius-sm); text-align: center;">
+          <div style="font-size: 0.72rem; color: var(--muted); font-weight: 600;">ÇIKTI TOKEN</div>
+          <div id="detailOutputTokens" style="font-weight: 800; font-family: var(--font-mono); font-size: 1.1rem; color: var(--cyan);">0</div>
+        </div>
+        <div style="background: var(--input-bg); padding: 12px; border-radius: var(--radius-sm); text-align: center;">
+          <div style="font-size: 0.72rem; color: var(--muted); font-weight: 600;">TOPLAM HARCANAN</div>
+          <div id="detailTotalTokens" style="font-weight: 800; font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent);">0</div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="reusePromptBtn" class="btn btn-secondary">Promptu Tekrar Yükle</button>
+        <button id="closeDetailBtn" class="btn btn-primary">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success);">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+    <span id="toastMsg">İşlem başarılı</span>
+  </div>
+
+  <!-- APP SCRIPT -->
+  <script>
+    (function () {
+      "use strict";
+
+      const STORAGE_KEY = "tokenkullanim_data_v1";
+
+      const defaultState = {
+        totalQuota: 1000000,
+        spentTokens: 0,
+        selectedModel: "gpt-4o",
+        history: []
+      };
+
+      let state = loadState();
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            return { ...defaultState, ...JSON.parse(raw) };
+          }
+        } catch (e) {
+          console.error("State load error:", e);
+        }
+        return { ...defaultState };
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+          console.error("State save error:", e);
+        }
+      }
+
+      // Token estimation algorithm with Turkish sub-word and symbol handling
+      function estimateTokens(text) {
+        if (!text || text.length === 0) return 0;
+        let tokenCount = 0;
+        const words = text.match(/\S+|\s+/g) || [];
+
+        for (const w of words) {
+          if (/^\s+$/.test(w)) {
+            tokenCount += Math.max(1, Math.floor(w.length / 4));
+            continue;
+          }
+
+          const nonAsciiCount = (w.match(/[^a-zA-Z0-9]/g) || []).length;
+          const len = w.length;
+
+          if (nonAsciiCount > 0) {
+            tokenCount += Math.ceil((len + nonAsciiCount * 0.8) / 3.2);
+          } else if (len <= 4) {
+            tokenCount += 1;
+          } else {
+            tokenCount += Math.ceil(len / 3.8);
+          }
+        }
+        return Math.max(1, tokenCount);
+      }
+
+      function tokenizeForDisplay(text) {
+        if (!text) return [];
+        const pieces = text.split(/(\s+|[.,!?;:()[\]{}'"])/);
+        const tokens = [];
+
+        for (const piece of pieces) {
+          if (!piece) continue;
+          if (piece.length <= 4) {
+            tokens.push(piece);
+          } else {
+            for (let i = 0; i < piece.length; i += 4) {
+              tokens.push(piece.slice(i, i + 4));
+            }
+          }
+        }
+        return tokens;
+      }
+
+      function getModelPricing(modelId) {
+        const select = document.getElementById("modelSelect");
+        const opt = select.querySelector(`option[value="${modelId}"]`) || select.options[0];
+        return {
+          id: opt.value,
+          name: opt.textContent.split("(")[0].trim(),
+          inputCostPerM: parseFloat(opt.dataset.in || "2.5"),
+          outputCostPerM: parseFloat(opt.dataset.out || "10.0")
+        };
+      }
+
+      function calculateCost(inputTokens, outputTokens, pricing) {
+        const inCost = (inputTokens / 1_000_000) * pricing.inputCostPerM;
+        const outCost = (outputTokens / 1_000_000) * pricing.outputCostPerM;
+        return inCost + outCost;
+      }
+
+      // DOM Elements
+      const quotaProgressBar = document.getElementById("quotaProgressBar");
+      const spentLabel = document.getElementById("spentLabel");
+      const percentRemainingLabel = document.getElementById("percentRemainingLabel");
+      const totalQuotaLabel = document.getElementById("totalQuotaLabel");
+      const metricRemaining = document.getElementById("metricRemaining");
+      const metricSpent = document.getElementById("metricSpent");
+      const metricCost = document.getElementById("metricCost");
+      const metricPromptCount = document.getElementById("metricPromptCount");
+      const remainingBadge = document.getElementById("remainingBadge");
+
+      const modelSelect = document.getElementById("modelSelect");
+      const currentModelBadge = document.getElementById("currentModelBadge");
+      const modelPriceHint = document.getElementById("modelPriceHint");
+      const systemPrompt = document.getElementById("systemPrompt");
+      const systemPromptContainer = document.getElementById("systemPromptContainer");
+      const toggleSystemPromptBtn = document.getElementById("toggleSystemPromptBtn");
+
+      const promptInput = document.getElementById("promptInput");
+      const livePromptTokens = document.getElementById("livePromptTokens");
+      const liveChars = document.getElementById("liveChars");
+      const liveWords = document.getElementById("liveWords");
+      const liveInputCost = document.getElementById("liveInputCost");
+
+      const outputPresetBtns = document.querySelectorAll(".output-preset-btn");
+      const customResponseArea = document.getElementById("customResponseArea");
+      const responseInput = document.getElementById("responseInput");
+
+      const toggleVizBtn = document.getElementById("toggleVizBtn");
+      const tokenVizBox = document.getElementById("tokenVizBox");
+      const tokenChipsContainer = document.getElementById("tokenChipsContainer");
+      const clearPromptBtn = document.getElementById("clearPromptBtn");
+      const executePromptBtn = document.getElementById("executePromptBtn");
+
+      const historyTableBody = document.getElementById("historyTableBody");
+      const historyCountBadge = document.getElementById("historyCountBadge");
+      const searchHistoryInput = document.getElementById("searchHistoryInput");
+      const exportCsvBtn = document.getElementById("exportCsvBtn");
+      const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+
+      // Modals
+      const configModal = document.getElementById("configModal");
+      const openConfigModalBtn = document.getElementById("openConfigModalBtn");
+      const closeConfigModalBtn = document.getElementById("closeConfigModalBtn");
+      const cancelConfigBtn = document.getElementById("cancelConfigBtn");
+      const saveConfigBtn = document.getElementById("saveConfigBtn");
+      const configQuotaInput = document.getElementById("configQuotaInput");
+      const configCurrentSpentInput = document.getElementById("configCurrentSpentInput");
+      const resetQuotaBtn = document.getElementById("resetQuotaBtn");
+
+      const detailModal = document.getElementById("detailModal");
+      const closeDetailModalBtn = document.getElementById("closeDetailModalBtn");
+      const closeDetailBtn = document.getElementById("closeDetailBtn");
+      const reusePromptBtn = document.getElementById("reusePromptBtn");
+      const detailModelDate = document.getElementById("detailModelDate");
+      const detailPromptText = document.getElementById("detailPromptText");
+      const detailInputTokens = document.getElementById("detailInputTokens");
+      const detailOutputTokens = document.getElementById("detailOutputTokens");
+      const detailTotalTokens = document.getElementById("detailTotalTokens");
+
+      let activeDetailItem = null;
+      let selectedOutputPreset = 150;
+
+      function formatNumber(num) {
+        return new Intl.NumberFormat("tr-TR").format(Math.round(num));
+      }
+
+      function formatCurrency(val) {
+        if (val < 0.0001 && val > 0) return "$" + val.toFixed(6);
+        return "$" + Number(val).toFixed(4);
+      }
+
+      function formatDate(isoStr) {
+        const d = new Date(isoStr);
+        return d.toLocaleDateString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      }
+
+      function renderDashboard() {
+        const remaining = Math.max(0, state.totalQuota - state.spentTokens);
+        const percentRemaining = state.totalQuota > 0 ? (remaining / state.totalQuota) * 100 : 0;
+
+        quotaProgressBar.style.width = Math.min(100, Math.max(0, percentRemaining)) + "%";
+        if (percentRemaining > 30) {
+          quotaProgressBar.style.background = "linear-gradient(90deg, #10b981 0%, #6366f1 100%)";
+          remainingBadge.style.background = "var(--success-light)";
+          remainingBadge.style.color = "var(--success)";
+          remainingBadge.textContent = "KULLANIMA HAZIR";
+          metricRemaining.style.color = "var(--success)";
+        } else if (percentRemaining > 10) {
+          quotaProgressBar.style.background = "linear-gradient(90deg, #f59e0b 0%, #ea580c 100%)";
+          remainingBadge.style.background = "var(--warning-light)";
+          remainingBadge.style.color = "var(--warning)";
+          remainingBadge.textContent = "KOTA AZALIYOR";
+          metricRemaining.style.color = "var(--warning)";
+        } else {
+          quotaProgressBar.style.background = "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)";
+          remainingBadge.style.background = "var(--danger-light)";
+          remainingBadge.style.color = "var(--danger)";
+          remainingBadge.textContent = "KRİTİK SEVİYE";
+          metricRemaining.style.color = "var(--danger)";
+        }
+
+        spentLabel.textContent = `Harcanan: ${formatNumber(state.spentTokens)}`;
+        percentRemainingLabel.textContent = `%${percentRemaining.toFixed(1)} Kalan`;
+        totalQuotaLabel.textContent = `Toplam: ${formatNumber(state.totalQuota)}`;
+
+        metricRemaining.textContent = formatNumber(remaining);
+        metricSpent.textContent = formatNumber(state.spentTokens);
+        metricPromptCount.textContent = formatNumber(state.history.length);
+
+        const totalCost = state.history.reduce((acc, item) => acc + (item.cost || 0), 0);
+        metricCost.textContent = formatCurrency(totalCost);
+
+        renderHistoryTable();
+      }
+
+      function renderLiveStats() {
+        const text = (systemPrompt.value ? systemPrompt.value + "\n" : "") + promptInput.value;
+        const inputTokens = estimateTokens(text);
+        const chars = text.length;
+        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+
+        livePromptTokens.textContent = formatNumber(inputTokens);
+        liveChars.textContent = formatNumber(chars);
+        liveWords.textContent = formatNumber(words);
+
+        const pricing = getModelPricing(modelSelect.value);
+        const inCost = (inputTokens / 1_000_000) * pricing.inputCostPerM;
+        liveInputCost.textContent = formatCurrency(inCost);
+
+        if (tokenVizBox.classList.contains("active")) {
+          const pieces = tokenizeForDisplay(promptInput.value);
+          tokenChipsContainer.innerHTML = pieces.map(p => {
+            const safe = p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return `<span class="token-chip">${safe.replace(/\n/g, "↵").replace(/ /g, "·")}</span>`;
+          }).join("");
+        }
+      }
+
+      function renderHistoryTable() {
+        const query = (searchHistoryInput.value || "").toLowerCase().trim();
+        const filtered = state.history.filter(item => {
+          if (!query) return true;
+          return (item.prompt && item.prompt.toLowerCase().includes(query)) ||
+                 (item.model && item.model.toLowerCase().includes(query));
+        });
+
+        historyCountBadge.textContent = `${filtered.length} Kayıt`;
+
+        if (filtered.length === 0) {
+          historyTableBody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--muted); padding: 36px 16px;">
+                ${query ? "Arama kriterine uygun kayıt bulunamadı." : "Henüz prompt kaydı bulunmuyor."}
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        historyTableBody.innerHTML = filtered.map((item, idx) => {
+          const shortPrompt = item.prompt ? item.prompt.replace(/\n/g, " ") : "(Boş Prompt)";
+          return `
+            <tr>
+              <td style="font-size: 0.78rem; color: var(--muted); white-space: nowrap;">${formatDate(item.timestamp)}</td>
+              <td><span style="font-weight: 700; font-size: 0.8rem;">${item.modelName || item.model}</span></td>
+              <td>
+                <div class="prompt-cell" title="Detayı görüntülemek için tıklayın" data-index="${idx}">
+                  ${escapeHtml(shortPrompt)}
+                </div>
+              </td>
+              <td style="font-family: var(--font-mono); font-size: 0.78rem; white-space: nowrap;">
+                <span title="Girdi">${formatNumber(item.inputTokens)}</span> / 
+                <span title="Çıktı" style="color: var(--cyan);">${formatNumber(item.outputTokens)}</span>
+              </td>
+              <td><span class="token-pill">${formatNumber(item.totalTokens)}</span></td>
+              <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted);">${formatNumber(item.remainingAfter)}</td>
+              <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--cyan);">${formatCurrency(item.cost || 0)}</td>
+            </tr>
+          `;
+        }).join("");
+
+        historyTableBody.querySelectorAll(".prompt-cell").forEach(cell => {
+          cell.addEventListener("click", () => {
+            const idx = parseInt(cell.getAttribute("data-index"), 10);
+            showPromptDetail(filtered[idx]);
+          });
+        });
+      }
+
+      function escapeHtml(text) {
+        if (!text) return "";
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function showToast(message) {
+        const toast = document.getElementById("toast");
+        const msg = document.getElementById("toastMsg");
+        msg.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 3200);
+      }
+
+      function showPromptDetail(item) {
+        if (!item) return;
+        activeDetailItem = item;
+        detailModelDate.textContent = `${item.modelName || item.model} · ${formatDate(item.timestamp)}`;
+        detailPromptText.textContent = item.prompt;
+        detailInputTokens.textContent = formatNumber(item.inputTokens);
+        detailOutputTokens.textContent = formatNumber(item.outputTokens);
+        detailTotalTokens.textContent = formatNumber(item.totalTokens);
+        detailModal.classList.add("active");
+      }
+
+      // Listeners
+      promptInput.addEventListener("input", renderLiveStats);
+      systemPrompt.addEventListener("input", renderLiveStats);
+
+      modelSelect.addEventListener("change", () => {
+        const pricing = getModelPricing(modelSelect.value);
+        currentModelBadge.textContent = pricing.name;
+        modelPriceHint.textContent = `$${pricing.inputCostPerM.toFixed(2)} / $${pricing.outputCostPerM.toFixed(2)} (1M token)`;
+        state.selectedModel = modelSelect.value;
+        saveState();
+        renderLiveStats();
+      });
+
+      document.querySelectorAll(".template-chips .chip-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          promptInput.value = btn.getAttribute("data-template") || "";
+          promptInput.focus();
+          renderLiveStats();
+        });
+      });
+
+      toggleSystemPromptBtn.addEventListener("click", () => {
+        const isHidden = systemPromptContainer.style.display === "none";
+        systemPromptContainer.style.display = isHidden ? "block" : "none";
+        toggleSystemPromptBtn.textContent = isHidden ? "- Gizle" : "+ Göster / Gizle";
+        if (isHidden) systemPrompt.focus();
+      });
+
+      outputPresetBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          outputPresetBtns.forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          const mode = btn.getAttribute("data-tokens");
+          if (mode === "custom") {
+            customResponseArea.style.display = "block";
+            selectedOutputPreset = "custom";
+            responseInput.focus();
+          } else {
+            customResponseArea.style.display = "none";
+            selectedOutputPreset = parseInt(mode, 10);
+          }
+        });
+      });
+
+      responseInput.addEventListener("input", () => {
+        if (selectedOutputPreset === "custom") {
+          renderLiveStats();
+        }
+      });
+
+      toggleVizBtn.addEventListener("click", () => {
+        tokenVizBox.classList.toggle("active");
+        renderLiveStats();
+      });
+
+      clearPromptBtn.addEventListener("click", () => {
+        promptInput.value = "";
+        responseInput.value = "";
+        renderLiveStats();
+        promptInput.focus();
+      });
+
+      executePromptBtn.addEventListener("click", () => {
+        const pText = promptInput.value.trim();
+        const sText = systemPrompt.value.trim();
+
+        if (!pText && !sText) {
+          showToast("Lütfen önce bir prompt girin!");
+          promptInput.focus();
+          return;
+        }
+
+        const fullPromptText = sText ? `[Sistem]: ${sText}\n\n[Kullanıcı]: ${pText}` : pText;
+        const inTokens = estimateTokens(fullPromptText);
+
+        let outTokens = 0;
+        if (selectedOutputPreset === "custom") {
+          outTokens = estimateTokens(responseInput.value.trim() || "Standart model yanıtı...");
+        } else {
+          outTokens = Number(selectedOutputPreset) || 150;
+        }
+
+        const totalHarcanan = inTokens + outTokens;
+        const pricing = getModelPricing(modelSelect.value);
+        const cost = calculateCost(inTokens, outTokens, pricing);
+
+        state.spentTokens += totalHarcanan;
+        const remainingAfter = Math.max(0, state.totalQuota - state.spentTokens);
+
+        const record = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          model: modelSelect.value,
+          modelName: pricing.name,
+          prompt: fullPromptText,
+          inputTokens: inTokens,
+          outputTokens: outTokens,
+          totalTokens: totalHarcanan,
+          cost: cost,
+          remainingAfter: remainingAfter
+        };
+
+        state.history.unshift(record);
+        saveState();
+
+        renderDashboard();
+        showToast(`${formatNumber(totalHarcanan)} token harcandı! (Kalan: ${formatNumber(remainingAfter)})`);
+      });
+
+      openConfigModalBtn.addEventListener("click", () => {
+        configQuotaInput.value = state.totalQuota;
+        configCurrentSpentInput.value = state.spentTokens;
+        configModal.classList.add("active");
+      });
+
+      closeConfigModalBtn.addEventListener("click", () => configModal.classList.remove("active"));
+      cancelConfigBtn.addEventListener("click", () => configModal.classList.remove("active"));
+
+      document.querySelectorAll(".quick-quota-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          configQuotaInput.value = btn.getAttribute("data-val");
+        });
+      });
+
+      saveConfigBtn.addEventListener("click", () => {
+        const newQuota = parseInt(configQuotaInput.value, 10);
+        const newSpent = parseInt(configCurrentSpentInput.value, 10) || 0;
+
+        if (isNaN(newQuota) || newQuota <= 0) {
+          alert("Lütfen geçerli bir toplam kota girin!");
+          return;
+        }
+
+        state.totalQuota = newQuota;
+        state.spentTokens = Math.max(0, newSpent);
+        saveState();
+        configModal.classList.remove("active");
+        renderDashboard();
+        showToast("Token kotası başarıyla güncellendi!");
+      });
+
+      resetQuotaBtn.addEventListener("click", () => {
+        if (confirm("Harcanan token sayacını sıfırlamak ve kotanızı tam bakiye yapmak istiyor musunuz?")) {
+          state.spentTokens = 0;
+          saveState();
+          renderDashboard();
+          showToast("Token harcaması sıfırlandı, bakiye yenilendi!");
+        }
+      });
+
+      searchHistoryInput.addEventListener("input", renderHistoryTable);
+
+      clearHistoryBtn.addEventListener("click", () => {
+        if (confirm("Tüm prompt kullanım geçmişini silmek istediğinize emin misiniz?")) {
+          state.history = [];
+          saveState();
+          renderDashboard();
+          showToast("Kullanım geçmişi temizlendi.");
+        }
+      });
+
+      exportCsvBtn.addEventListener("click", () => {
+        if (state.history.length === 0) {
+          showToast("Dışa aktarılacak kayıt yok.");
+          return;
+        }
+
+        const headers = ["Tarih", "Model", "Prompt", "Girdi Token", "Çıktı Token", "Toplam Token", "Maliyet ($)", "Kalan Bakiye"];
+        const rows = state.history.map(h => [
+          `"${h.timestamp}"`,
+          `"${h.modelName || h.model}"`,
+          `"${(h.prompt || '').replace(/"/g, '""')}"`,
+          h.inputTokens,
+          h.outputTokens,
+          h.totalTokens,
+          (h.cost || 0).toFixed(6),
+          h.remainingAfter
+        ]);
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `token_kullanim_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("CSV raporu indirildi!");
+      });
+
+      closeDetailModalBtn.addEventListener("click", () => detailModal.classList.remove("active"));
+      closeDetailBtn.addEventListener("click", () => detailModal.classList.remove("active"));
+
+      reusePromptBtn.addEventListener("click", () => {
+        if (activeDetailItem) {
+          promptInput.value = activeDetailItem.prompt;
+          detailModal.classList.remove("active");
+          renderLiveStats();
+          promptInput.focus();
+          showToast("Prompt giriş alanına yüklendi.");
+        }
+      });
+
+      const themeToggleBtn = document.getElementById("themeToggleBtn");
+      themeToggleBtn.addEventListener("click", () => {
+        const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        if (isDark) {
+          document.documentElement.removeAttribute("data-theme");
+          localStorage.setItem("tokenkullanim_theme", "light");
+        } else {
+          document.documentElement.setAttribute("data-theme", "dark");
+          localStorage.setItem("tokenkullanim_theme", "dark");
+        }
+      });
+
+      if (state.selectedModel) {
+        modelSelect.value = state.selectedModel;
+      }
+      const initialPricing = getModelPricing(modelSelect.value);
+      currentModelBadge.textContent = initialPricing.name;
+      modelPriceHint.textContent = `$${initialPricing.inputCostPerM.toFixed(2)} / $${initialPricing.outputCostPerM.toFixed(2)} (1M token)`;
+
+      renderDashboard();
+      renderLiveStats();
+    })();
+  </script>
+</body>
+</html>
