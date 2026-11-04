@@ -1,5 +1,7 @@
 # 🪙 TokenKullanım (Token Usage & Budget Tracker)
 
+[🇹🇷 Türkçe](README.md) | [🇬🇧 English](README.en.md)
+
 Yapay zeka modellerine (OpenAI GPT-4o, Claude 3.5 Sonnet, Gemini 2.0 Flash, DeepSeek-V3 vb.) gönderilen her promptun ne kadar token tükettiğini, model yanıt maliyetini ve kalan bütçe / token kotanızı anlık olarak hesaplayan modern, hafif ve bağımsız bir takip uygulamasıdır.
 
 ---
